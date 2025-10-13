@@ -183,6 +183,6 @@ function measureProxiedLatency(
   }
 }
 
-app.listen(3000, () => {
-    console.log("Server is running at port 3000! Access /now-status to run the measurement.");
+app.listen(process.env.PORT| 5000, () => {
+    console.log("Server is running at port 5000! Access /now-status to run the measurement.");
 })
