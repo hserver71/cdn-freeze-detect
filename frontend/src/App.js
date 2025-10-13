@@ -1,21 +1,17 @@
-import logo from './logo.svg';
+import React from 'react';
+import StatusTable from './StatusTable';
 import './App.css';
-import SmartTable from './SmartTable';
-
-const sampleData = [
-  { name: "Alice", age: 25, country: "USA" },
-  { name: "Bob", age: 30, country: "UK" },
-  { name: "Charlie", age: 28, country: "Canada" },
-  { name: "David", age: 35, country: "Australia" },
-  { name: "Eve", age: 22, country: "Germany" },
-  { name: "Frank", age: 33, country: "France" },
-];
 
 function App() {
   return (
-    <div>
-      <h2 style={{ textAlign: "center" }}>Current Status</h2>
-      <SmartTable data={sampleData} />
+    <div className="App">
+      <header className="App-header">
+        <h1>CDN Freeze Detect</h1>
+        <p>Real-time monitoring of proxy server status</p>
+      </header>
+      <main>
+        <StatusTable />
+      </main>
     </div>
   );
 }
