@@ -1,117 +1,168 @@
-import express from 'express'
-import net from 'net';
-import env from 'dotenv'
-import { HttpsProxyAgent } from 'https-proxy-agent';
-import tunnel from 'tunnel'
-import { performance } from 'perf_hooks';
-import http from 'http';
+const express = require('express')
+const env = require('dotenv')
+const tunnel = require('tunnel')
+const { performance } = require('perf_hooks')
+const http = require('http')
+const { default: axios } = require('axios')
 const app = express()
+
 env.config();
 
+// Standard Express setup
 app.get('/', (req, res) => {
-    res.send('Hello World')
+    res.json({ message: 'Network status server running.' });
 })
-1
-app.get('/now-status', (req, res) => {
-    // The Target Host and Port 
-    const TARGET_HOST = '93.119.105.170';
-    const TARGET_PORT = 80; // Standard port for tunneling, change if needed
+app.get('get-nodes', (req, res) => {
+    axios.get("https://slave.host-palace.net/portugal_cdn/get_node_list", (res) => {
+        console.log(res);
+    })
+})
 
-    // 🛠️ Your HTTP/HTTPS Proxy Details
+app.get('/now-status', async (req, res) => {
+    // --- Configuration Variables ---
+    // The Target Host and Port 
+    const TARGET_HOST = 'x';
+    const TARGET_PORT = 80;
+
+    // 🛠️ Your HTTP/HTTP Proxy Details
     const PROXY_HOST = 'proxy.soax.com';
     const PROXY_PORT = 10220;
 
-    // 🔑 PROXY AUTHENTICATION (REQUIRED FOR MOST COMMERCIAL PROXIES)
-    // If your proxy needs authentication, fill these in. Otherwise, leave them empty strings.
-    const PROXY_USER = ''; // e.g., 'soax_username'
-    const PROXY_PASS = ''; // e.g., 'your_password123'
+    // 🔑 PROXY AUTHENTICATION (MUST BE FILLED IN FOR COMMERCIAL PROXIES)
+    // **CRITICAL: Replace these empty strings with your actual Soax credentials.**
+    const PROXY_USER = process.env.PROXY_USER || ''; // Load from .env or set here
+    const PROXY_PASS = process.env.PROXY_PASS || ''; // Load from .env or set here
 
     const TIMEOUT_MS = 10000; // 10 seconds timeout
+    // -------------------------------
 
-    // -----------------------------------------------------------
-    // 🛠️ NETWORK MEASUREMENT FUNCTION
-    // -----------------------------------------------------------
+    // Convert the measurement function to return a Promise so we can await it
+    const result = await new Promise(resolve => {
+        measureProxiedLatency(TARGET_HOST, TARGET_PORT, PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS, TIMEOUT_MS, resolve);
+    });
 
-    function measureProxiedLatency(targetHost, targetPort, proxyHost, proxyPort, user, pass) {
-        const authString = (user && pass) ? `${user}:${pass}` : '';
-        console.log(`📡 Attempting TCP connection to ${targetHost}:${targetPort} via proxy: ${proxyHost}:${proxyPort}`);
+    // Send the result back to the client
+    res.json(result);
+});
 
-        const startTime = performance.now();
+// -----------------------------------------------------------
+// 🛠️ NETWORK MEASUREMENT FUNCTION (Promise Wrapper)
+// -----------------------------------------------------------
 
-        try {
-            // 1. Configure the tunnel agent (handles the HTTP CONNECT request)
-            const proxyConfig = {
-                host: proxyHost,
-                port: proxyPort,
-                headers: {
-                    'User-Agent': 'Node.js-Network-Check'
+/**
+ * Measures the network latency (RTT) to a target host via an HTTP proxy.
+ * @param {string} targetHost - The final host IP or domain.
+ * @param {number} targetPort - The final port (e.g., 80 or 443).
+ * @param {string} proxyHost - The proxy server host.
+ * @param {number} proxyPort - The proxy server port.
+ * @param {string} user - Proxy username.
+ * @param {string} pass - Proxy password.
+ * @param {number} timeout - Request timeout in milliseconds.
+ * @param {function} resolve - The Promise resolver function.
+ */
+function measureProxiedLatency(targetHost, targetPort, proxyHost, proxyPort, user, pass, timeout, resolve) {
+    const authString = (user && pass) ? `${user}:${pass}` : '';
+    const startTime = performance.now();
+
+    const resultTemplate = {
+        target: `${targetHost}:${targetPort}`,
+        proxy: `${proxyHost}:${proxyPort}`,
+        status: 'pending',
+        rtt: null,
+        error: null,
+        message: null
+    };
+
+    console.log(`\n📡 Attempting connection to ${targetHost}:${targetPort} via proxy: ${proxyHost}:${proxyPort}`);
+
+    try {
+        // 1. Configure the tunnel agent (handles the HTTP CONNECT request)
+        const proxyConfig = {
+            host: proxyHost,
+            port: proxyPort,
+            headers: { 'User-Agent': 'Node.js-Network-Check' }
+        };
+
+        if (authString) {
+            proxyConfig.proxyAuth = authString;
+        }
+
+        // Since the target is port 80 (HTTP), we use httpOverHttp
+        const tunnelingAgent = tunnel.httpOverHttp({ proxy: proxyConfig });
+
+        // 2. Define the request options
+        const requestOptions = {
+            method: 'HEAD',
+            host: targetHost,
+            port: targetPort,
+            agent: tunnelingAgent,
+            timeout: timeout
+        };
+
+        // 3. Initiate the Request, which triggers the TCP CONNECT tunnel
+        const req = http.request(requestOptions, (res) => {
+            const endTime = performance.now();
+            const rtt = (endTime - startTime).toFixed(2);
+            resultTemplate.rtt = `${rtt}ms`;
+
+            // Check for proxy-side errors (400-level codes returned by the proxy)
+            if (res.statusCode >= 400 && res.statusCode < 500) {
+                resultTemplate.status = 'proxy_rejected';
+                resultTemplate.error = res.statusCode;
+
+                if (res.statusCode === 407) {
+                    resultTemplate.message = 'Proxy Authentication Required (407). Check PROXY_USER and PROXY_PASS.';
+                } else {
+                    resultTemplate.message = `Proxy rejected connection with HTTP Status: ${res.statusCode}.`;
                 }
-            };
-
-            if (authString) {
-                proxyConfig.proxyAuth = authString;
+            } else {
+                // Success: TCP tunnel established and target responded to HEAD request
+                resultTemplate.status = 'success';
+                resultTemplate.message = 'Connection via proxy successful.';
             }
 
-            const tunnelingAgent = tunnel.httpsOverHttp({ proxy: proxyConfig });
+            res.resume(); // Consume the response data
+            resolve(resultTemplate);
+        });
 
-            // 2. Define the request options to initiate the tunnel
-            const requestOptions = {
-                method: 'HEAD',
-                host: targetHost,
-                port: targetPort,
-                agent: tunnelingAgent,
-                timeout: TIMEOUT_MS
-            };
+        // Error Handling (network errors like DNS, ECONNREFUSED, or the dreaded 'socket hang up')
+        req.on('error', (err) => {
+            const duration = (performance.now() - startTime).toFixed(2);
+            resultTemplate.rtt = `${duration}ms`;
+            resultTemplate.status = 'failed';
 
-            // 3. Initiate the Request, which triggers the TCP CONNECT tunnel
-            const req = http.request(requestOptions, (res) => {
-                const endTime = performance.now();
-                const rtt = (endTime - startTime).toFixed(2);
+            if (err.message === 'socket hang up') {
+                // This is the common case for unauthenticated/rejected proxy connections
+                resultTemplate.error = 'SocketHangUp';
+                resultTemplate.message = 'The proxy dropped the connection abruptly. **Likely cause: Missing or invalid proxy credentials.**';
+            } else {
+                resultTemplate.error = err.code || 'NetworkError';
+                resultTemplate.message = err.message;
+            }
+            resolve(resultTemplate);
+        });
 
-                // Check for proxy-side errors (400-level codes)
-                if (res.statusCode >= 400 && res.statusCode < 500) {
-                    console.error(`\n❌ Proxy Rejected Connection. HTTP Status: **${res.statusCode}**`);
-                    if (res.statusCode === 407) {
-                        console.error('Error Diagnosis: **Proxy Authentication Required (407).** Check your PROXY_USER and PROXY_PASS.');
-                    } else if (res.statusCode === 403 || res.statusCode === 422) {
-                        console.error('Error Diagnosis: **Access Denied or Unprocessable Entity (403/422).** The proxy rules are blocking the target.');
-                    } else {
-                        console.error('Error Diagnosis: The proxy service is actively blocking this request or target.');
-                    }
-                } else {
-                    console.log(`\n✅ Connection via proxy successful (TCP Handshake completed).`);
-                    console.log(`Target: ${targetHost}:${targetPort}`);
-                    console.log(`Measured Network Status (RTT): **${rtt}ms**`);
-                }
+        // Timeout Handling
+        req.on('timeout', () => {
+            const duration = (performance.now() - startTime).toFixed(2);
+            req.destroy();
+            resultTemplate.rtt = `${duration}ms`;
+            resultTemplate.status = 'timeout';
+            resultTemplate.error = 'ETIMEOUT';
+            resultTemplate.message = `Connection timed out after ${timeout}ms.`;
+            resolve(resultTemplate);
+        });
 
-                res.resume();
-            });
+        req.end();
 
-            // Error Handling (network errors before proxy response)
-            req.on('error', (err) => {
-                const duration = (performance.now() - startTime).toFixed(2);
-                console.error(`\n❌ Connection Failed. Attempt Duration: ${duration}ms`);
-                console.error(`Error Details: **${err.message}**`);
-            });
-
-            // Timeout Handling
-            req.on('timeout', () => {
-                const duration = (performance.now() - startTime).toFixed(2);
-                console.error(`\n❌ Connection Timed Out (${TIMEOUT_MS}ms). Attempt Duration: ${duration}ms`);
-                req.destroy();
-            });
-
-            req.end();
-
-        } catch (e) {
-            console.error(`\n❌ Script Setup Error: ${e.message}`);
-        }
+    } catch (e) {
+        resultTemplate.status = 'error';
+        resultTemplate.error = 'ScriptSetupError';
+        resultTemplate.message = `Critical initialization error: ${e.message}`;
+        resolve(resultTemplate);
     }
-
-    // Execute the measurement
-    measureProxiedLatency(TARGET_HOST, TARGET_PORT, PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS);
-})
+}
 
 app.listen(3000, () => {
-    console.log("Server is running at port 3000!");
+    console.log("Server is running at port 3000! Access /now-status to run the measurement.");
 })
