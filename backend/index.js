@@ -21,7 +21,7 @@ app.get('get-nodes', (req, res) => {
 app.get('/now-status', async (req, res) => {
     // --- Configuration Variables ---
     // The Target Host and Port 
-    const TARGET_HOST = 'x';
+    const TARGET_HOST = '23.227.130.42';
     const TARGET_PORT = 80;
 
     // 🛠️ Your HTTP/HTTP Proxy Details
