@@ -11,7 +11,7 @@ env.config();
 app.get('/', (req, res) => {
     res.send('Hello World')
 })
-
+1
 app.get('/now-status', (req, res) => {
     // The Target Host and Port 
     const TARGET_HOST = '93.119.105.170';
