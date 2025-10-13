@@ -1,204 +1,399 @@
-const express = require('express')
-const env = require('dotenv')
-const tunnel = require('tunnel')
-const { performance } = require('perf_hooks')
-const http = require('http')
-const { default: axios } = require('axios')
+const express = require('express');
 const cors = require('cors');
+const WebSocket = require('ws');
+const http = require('http');
+require('dotenv').config();
 
-const app = express()
-// Enable CORS for all routes
+const { createDbConnection, initializeDatabase } = require('./config/database');
+const DatabaseService = require('./services/databaseService');
+const ProxyService = require('./services/proxyService');
+const MeasurementController = require('./controllers/measurementController');
+const SystemController = require('./controllers/systemController');
+const apiRoutes = require('./routes');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({
+  server,
+  path: '/ws' // Add explicit WebSocket path
+});
+
+const PORT = process.env.PORT || 5000;
+
+// Middleware
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://162.247.153.49:3000',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    } else {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-  },
+  origin: ['http://162.247.153.49:3000', 'http://localhost:3000', 'http://127.0.0.1:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
+app.use(express.json());
 
-env.config();
+// WebSocket connections storage
+const clients = new Set();
 
-// Standard Express setup
-app.get('/', (req, res) => {
-    res.json({ message: 'Network status server running.' });
-})
+// WebSocket connection handler
+wss.on('connection', (ws, req) => {
+  console.log('🔌 New WebSocket connection from:', req.headers.origin);
+  clients.add(ws);
 
-app.get('/get-nodes', (req, res) => {
-    axios.get("https://slave.host-palace.net/portugal_cdn/get_node_list")
-        .then(response => {
-            res.json(response.data);
-        })
-        .catch(err => {
-            res.status(500).json({ error: err.message });
-        });
-})
+  // Send initial connection confirmation
+  ws.send(JSON.stringify({
+    type: 'connection_established',
+    message: 'Connected to measurement server',
+    timestamp: new Date().toISOString()
+  }));
 
-app.get('/now-status', async (req, res) => {
+  ws.on('close', () => {
+    console.log('🔌 WebSocket connection closed');
+    clients.delete(ws);
+  });
+
+  ws.on('error', (error) => {
+    console.error('❌ WebSocket error:', error);
+    clients.delete(ws);
+  });
+
+  // Handle incoming messages from clients
+  ws.on('message', (message) => {
     try {
-        const { proxyPort } = req.query;
-        const defaultPort = 10220;
-        const selectedPort = proxyPort ? parseInt(proxyPort) : defaultPort;
+      const data = JSON.parse(message);
+      console.log('📨 Received WebSocket message:', data);
 
-        const url = "https://slave.host-palace.net/portugal_cdn/get_node_list";
-        const response = await axios.get(url);
-        const data = response.data;
-
-        const ipList = data
-            .filter(item => typeof item === "object" && item.category === 4)
-            .map(item => item.ip);
-
-        console.log(`🔄 Processing ${ipList.length} IPs via proxy port ${selectedPort}...`);
-
-        // Process in parallel instead of sequentially
-        const results = await Promise.all(
-            ipList.map(ip => measureProxiedLatencyAsync(
-                ip, 
-                80, 
-                'proxy.soax.com', 
-                selectedPort, // Use the selected port from frontend
-                process.env.PROXY_USER, 
-                process.env.PROXY_PASS, 
-                10000
-            ))
-        );
-
-        console.log(`✅ Completed measurements for ${results.length} targets using port ${selectedPort}`);
-
-        res.json({
-            status: "completed",
-            count: results.length,
-            proxyPort: selectedPort,
-            results
-        });
-    } catch (err) {
-        console.error("Error:", err.message);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// -----------------------------------------------------------
-// 🛠️ NETWORK MEASUREMENT FUNCTION (Promise Wrapper)
-// -----------------------------------------------------------
-
-/**
- * Measures the network latency (RTT) to a target host via an HTTP proxy.
- * @param {string} targetHost - The final host IP or domain.
- * @param {number} targetPort - The final port (e.g., 80 or 443).
- * @param {string} proxyHost - The proxy server host.
- * @param {number} proxyPort - The proxy server port.
- * @param {string} user - Proxy username.
- * @param {string} pass - Proxy password.
- * @param {number} timeout - Request timeout in milliseconds.
- */
-function measureProxiedLatencyAsync(
-  targetHost,
-  targetPort,
-  proxyHost,
-  proxyPort,
-  user,
-  pass,
-  timeout
-) {
-  return new Promise((resolve) => {
-    const authString = (user && pass) ? `${user}:${pass}` : '';
-    const startTime = performance.now();
-
-    const resultTemplate = {
-      target: `${targetHost}:${targetPort}`,
-      proxy: `${proxyHost}:${proxyPort}`,
-      status: 'pending',
-      rtt: null,
-      error: null,
-      message: null
-    };
-
-    console.log(`📡 Measuring full RTT to ${targetHost}:${targetPort} via proxy`);
-
-    try {
-      const proxyConfig = {
-        host: proxyHost,
-        port: proxyPort,
-        headers: { 'User-Agent': 'Node.js-Network-Check' }
-      };
-
-      if (authString) {
-        proxyConfig.proxyAuth = authString;
+      // Handle ping/pong for connection health
+      if (data.type === 'ping') {
+        ws.send(JSON.stringify({
+          type: 'pong',
+          timestamp: new Date().toISOString()
+        }));
       }
-
-      const tunnelingAgent = tunnel.httpOverHttp({ proxy: proxyConfig });
-
-      // ✅ We make an actual HEAD request to the *target*, not just CONNECT
-      const requestOptions = {
-        method: 'HEAD',
-        host: targetHost,
-        port: targetPort,
-        path: '/',              // ✅ Required to reach the target server
-        agent: tunnelingAgent,
-        timeout
-      };
-
-      const req = http.request(requestOptions, (res) => {
-        const endTime = performance.now();
-        const rtt = (endTime - startTime).toFixed(2);
-        resultTemplate.rtt = `${rtt}ms`;
-
-        if (res.statusCode >= 400 && res.statusCode < 500) {
-          resultTemplate.status = 'proxy_rejected';
-          resultTemplate.error = res.statusCode;
-          resultTemplate.message = `Proxy rejected with HTTP ${res.statusCode}`;
-        } else {
-          resultTemplate.status = 'success';
-          resultTemplate.message = `Target host responded through proxy.`;
-        }
-
-        res.resume();
-        resolve(resultTemplate);
-      });
-
-      req.on('error', (err) => {
-        const duration = (performance.now() - startTime).toFixed(2);
-        resultTemplate.rtt = `${duration}ms`;
-        resultTemplate.status = 'failed';
-        resultTemplate.error = err.code || 'NetworkError';
-        resultTemplate.message = err.message;
-        resolve(resultTemplate);
-      });
-
-      req.on('timeout', () => {
-        const duration = (performance.now() - startTime).toFixed(2);
-        req.destroy();
-        resultTemplate.rtt = `${duration}ms`;
-        resultTemplate.status = 'timeout';
-        resultTemplate.error = 'ETIMEOUT';
-        resultTemplate.message = `Timed out after ${timeout}ms`;
-        resolve(resultTemplate);
-      });
-
-      req.end();
-
-    } catch (e) {
-      resultTemplate.status = 'error';
-      resultTemplate.error = 'ScriptSetupError';
-      resultTemplate.message = e.message;
-      resolve(resultTemplate);
+    } catch (error) {
+      console.error('❌ Error parsing WebSocket message:', error);
     }
   });
-}
-
-app.listen(process.env.PORT || 5000, () => {
-    console.log("Server is running at port 5000! Access /now-status to run the measurement.");
 });
+
+// Broadcast to all connected clients
+const broadcastToClients = (data) => {
+  const message = JSON.stringify(data);
+  let sentCount = 0;
+
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+      sentCount++;
+    }
+  });
+
+  console.log(`📤 Broadcast to ${sentCount}/${clients.size} clients`);
+};
+
+// Global state
+let db;
+let databaseService;
+let proxyService;
+let measurementController;
+let systemController;
+let measurementInterval;
+let isMeasuring = false;
+
+// Function to refresh IP list
+const refreshIpList = async () => {
+  try {
+    console.log('🔄 Refreshing IP list...');
+
+    // Call the method to refresh targets in ProxyService
+    await proxyService.refreshTargets();
+
+    const currentTargets = proxyService.getTargets();
+    console.log(`✅ IP list refreshed. Current targets: ${currentTargets.length}`);
+
+    broadcastToClients({
+      type: 'ip_list_updated',
+      message: `IP list updated with ${currentTargets.length} targets`,
+      targetCount: currentTargets.length,
+      timestamp: new Date().toISOString()
+    });
+
+    return currentTargets;
+  } catch (error) {
+    console.error('❌ Error refreshing IP list:', error.message);
+    throw error;
+  }
+};
+
+// Manual measurement function (UPDATED)
+const runManualMeasurements = async () => {
+  if (isMeasuring) {
+    console.log('⏳ Measurement already in progress, skipping manual request...');
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'already_running',
+      message: 'Measurement already in progress',
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  isMeasuring = true;
+
+  try {
+    console.log('🚀 Starting manual measurements...');
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'started',
+      message: 'Manual measurement started',
+      timestamp: new Date().toISOString()
+    });
+
+    // Refresh IP list before manual measurement
+    await refreshIpList();
+
+    // await proxyService.runMeasurements(databaseService, 'tcp_handshake');
+    await proxyService.runMeasurements(databaseService, 'http');
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'completed',
+      message: 'Manual measurement completed',
+      timestamp: new Date().toISOString()
+    });
+
+    // Notify clients to refresh data
+    broadcastToClients({
+      type: 'data_updated',
+      message: 'New measurement data available',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error during manual measurements:', error.message);
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'error',
+      message: 'Measurement failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  } finally {
+    isMeasuring = false;
+  }
+};
+
+// Scheduled measurement function (UPDATED)
+const runScheduledMeasurements = async () => {
+  if (isMeasuring) {
+    console.log('⏳ Measurement already in progress, skipping scheduled run...');
+    return;
+  }
+
+  isMeasuring = true;
+
+  try {
+    console.log('🔄 Starting scheduled measurements...');
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'scheduled_started',
+      message: 'Scheduled measurement started',
+      timestamp: new Date().toISOString()
+    });
+
+    // Refresh IP list before scheduled measurement
+    await refreshIpList();
+
+    await proxyService.runMeasurements(databaseService, 'http');
+    // await proxyService.runMeasurements(databaseService, 'tcp_handshake');
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'scheduled_completed',
+      message: 'Scheduled measurement completed',
+      timestamp: new Date().toISOString()
+    });
+
+    // Notify clients to refresh data
+    broadcastToClients({
+      type: 'data_updated',
+      message: 'New measurement data available from scheduled run',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error during scheduled measurements:', error.message);
+
+    broadcastToClients({
+      type: 'measurement_status',
+      status: 'error',
+      message: 'Scheduled measurement failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  } finally {
+    isMeasuring = false;
+  }
+};
+
+const startScheduledMeasurements = () => {
+  const MEASUREMENT_INTERVAL = 3 * 60 * 1000; // 3 minutes
+
+  console.log(`⏰ Starting automatic measurements every ${MEASUREMENT_INTERVAL / 60000} minutes`);
+
+  // Run immediately on startup
+  runScheduledMeasurements();
+
+  // Then run every 3 minutes
+  measurementInterval = setInterval(() => {
+    runScheduledMeasurements();
+  }, MEASUREMENT_INTERVAL);
+};
+
+const stopScheduledMeasurements = () => {
+  if (measurementInterval) {
+    clearInterval(measurementInterval);
+    measurementInterval = null;
+    console.log('🛑 Stopped automatic measurements');
+  }
+};
+
+// Manual IP list refresh endpoint
+app.post('/api/measurements/refresh-ips', async (req, res) => {
+  try {
+    console.log('🔄 Manual IP list refresh requested');
+
+    const targets = await refreshIpList();
+
+    res.json({
+      success: true,
+      message: `IP list refreshed with ${targets.length} targets`,
+      targetCount: targets.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error refreshing IP list:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh IP list'
+    });
+  }
+});
+
+// WebSocket info endpoint
+app.get('/api/websocket/info', (req, res) => {
+  res.json({
+    connectedClients: clients.size,
+    isWebSocketServer: true,
+    serverTime: new Date().toISOString()
+  });
+});
+
+const initializeApp = async () => {
+  try {
+    // Initialize database
+    db = createDbConnection();
+    await initializeDatabase(db);
+
+    // Initialize services
+    databaseService = new DatabaseService(db);
+    proxyService = new ProxyService();
+
+    // Initialize controllers
+    measurementController = new MeasurementController(databaseService);
+    systemController = new SystemController(databaseService);
+
+    // Add near other controller imports
+    const HistoryController = require('./controllers/historyController');
+
+    // In initializeApp function, add:
+    const historyController = new HistoryController(databaseService);
+
+    // Update routes setup:
+    app.use('/api', apiRoutes(measurementController, systemController, historyController));
+
+    // Manual measurement endpoint
+    app.post('/api/measurements/send-packet', async (req, res) => {
+      try {
+        console.log('📦 Manual packet send requested');
+
+        broadcastToClients({
+          type: 'measurement_status',
+          status: 'manual_requested',
+          message: 'Manual packet send requested',
+          timestamp: new Date().toISOString()
+        });
+
+        // Run measurements in background (don't wait for completion)
+        runManualMeasurements();
+
+        res.json({
+          success: true,
+          message: 'Packet send initiated',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('❌ Error initiating manual measurement:', error.message);
+        res.status(500).json({
+          success: false,
+          error: 'Failed to initiate measurement'
+        });
+      }
+    });
+
+    // Control endpoints
+    app.get('/measurements/start', (req, res) => {
+      startScheduledMeasurements();
+      res.json({ message: 'Scheduled measurements started' });
+    });
+
+    app.get('/measurements/stop', (req, res) => {
+      stopScheduledMeasurements();
+      res.json({ message: 'Scheduled measurements stopped' });
+    });
+
+    app.get('/measurements/status', (req, res) => {
+      res.json({
+        isRunning: measurementInterval !== null,
+        isMeasuring: isMeasuring,
+        interval: 3 * 60 * 1000,
+        nextRun: measurementInterval ? 'Active' : 'Stopped',
+        connectedClients: clients.size
+      });
+    });
+
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running at port ${PORT}!`);
+      console.log(`🔌 WebSocket server running on ws://162.247.153.49:${PORT}/ws`);
+      console.log(`⏰ Automatic measurements: ENABLED`);
+      console.log(`📦 Manual packet endpoint: POST /api/measurements/send-packet`);
+      console.log(`🔄 IP refresh endpoint: POST /api/measurements/refresh-ips`);
+
+      // Start scheduled measurements
+      startScheduledMeasurements();
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to initialize application:', error.message);
+    process.exit(1);
+  }
+};
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  stopScheduledMeasurements();
+
+  // Close all WebSocket connections
+  clients.forEach(client => {
+    client.close();
+  });
+
+  if (db) {
+    db.end();
+  }
+  process.exit(0);
+});
+
+// Start the application
+initializeApp();
