@@ -6,22 +6,28 @@ const StatusTable = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [columnCount, setColumnCount] = useState(30);
+  const [proxyPort, setProxyPort] = useState('10220'); // Default port
 
-  // Use ref to always get the latest columnCount
+  // Use ref to always get the latest values
   const columnCountRef = useRef(columnCount);
+  const proxyPortRef = useRef(proxyPort);
 
-  // Backend URL
-  const BACKEND_URL = 'http://162.247.153.49:5000/now-status';
-
-  // Update ref when columnCount changes
+  // Update refs when values change
   useEffect(() => {
     columnCountRef.current = columnCount;
   }, [columnCount]);
 
+  useEffect(() => {
+    proxyPortRef.current = proxyPort;
+  }, [proxyPort]);
+
   // Function to fetch status data with Axios
-  const fetchStatus = async () => {
+  const fetchStatus = async (clearExistingData = false) => {
     try {
       setLoading(true);
+      // Include proxy port in the URL
+      const BACKEND_URL = `http://162.247.153.49:5000/now-status?proxyPort=${proxyPort}`;
+      
       const response = await axios.get(BACKEND_URL, {
         timeout: 120000, // 2 minute timeout for backend processing
         headers: {
@@ -37,36 +43,52 @@ const StatusTable = () => {
         const results = data.results;
         
         setStatusData(prevData => {
-          // Add timestamp to each result
-          const timestampedData = results.map(item => ({
-            ...item,
-            timestamp: new Date(),
-            id: Date.now() + Math.random()
-          }));
-          
-          // For multiple rows, we need to handle each row separately
-          if (prevData.length === 0) {
-            // Initial data - create rows
-            return timestampedData.map((row, index) => ({
-              ...row,
-              rowNumber: index + 1, // Add row number starting from 1
-              history: [row] // Start history with current data
+          // If we're clearing existing data (port changed), start fresh
+          if (clearExistingData) {
+            // Create completely new data with fresh history
+            return results.map((item, index) => ({
+              ...item,
+              timestamp: new Date(),
+              id: Date.now() + Math.random(),
+              rowNumber: index + 1,
+              history: [{
+                ...item,
+                timestamp: new Date(),
+                id: Date.now() + Math.random()
+              }] // Start fresh history
             }));
           } else {
-            // Update existing rows with new data
-            return prevData.map((existingRow, index) => {
-              const newRowData = timestampedData[index];
-              if (newRowData) {
-                const newHistory = [...(existingRow.history || []), newRowData].slice(-columnCountRef.current);
-                return {
-                  ...existingRow,
-                  ...newRowData,
-                  rowNumber: index + 1, // Keep row number
-                  history: newHistory
-                };
-              }
-              return existingRow;
-            });
+            // Add timestamp to each result
+            const timestampedData = results.map(item => ({
+              ...item,
+              timestamp: new Date(),
+              id: Date.now() + Math.random()
+            }));
+            
+            // For multiple rows, we need to handle each row separately
+            if (prevData.length === 0) {
+              // Initial data - create rows
+              return timestampedData.map((row, index) => ({
+                ...row,
+                rowNumber: index + 1, // Add row number starting from 1
+                history: [row] // Start history with current data
+              }));
+            } else {
+              // Update existing rows with new data (append to history)
+              return prevData.map((existingRow, index) => {
+                const newRowData = timestampedData[index];
+                if (newRowData) {
+                  const newHistory = [...(existingRow.history || []), newRowData].slice(-columnCountRef.current);
+                  return {
+                    ...existingRow,
+                    ...newRowData,
+                    rowNumber: index + 1, // Keep row number
+                    history: newHistory
+                  };
+                }
+                return existingRow;
+              });
+            }
           }
         });
         
@@ -100,10 +122,19 @@ const StatusTable = () => {
   useEffect(() => {
     fetchStatus(); // Initial fetch
     
-    const interval = setInterval(fetchStatus, 180000); // Fetch every 3 minutes
+    const interval = setInterval(() => fetchStatus(false), 180000); // Fetch every 3 minutes (append mode)
     
     return () => clearInterval(interval); // Cleanup on unmount
   }, []);
+
+  // When proxy port changes, clear data and fetch new
+  useEffect(() => {
+    if (statusData.length > 0) {
+      // Clear existing data and fetch fresh data with new port
+      setStatusData([]);
+      fetchStatus(true); // true = clear existing data
+    }
+  }, [proxyPort]); // This effect runs when proxyPort changes
 
   // Update data when column count changes
   useEffect(() => {
@@ -178,7 +209,7 @@ const StatusTable = () => {
       const displayHistory = [...history, ...emptySlots];
       
       return (
-        <tr key={row.target || rowIndex} className="data-row">
+        <tr key={`${row.target}-${proxyPort}-${rowIndex}`} className="data-row">
           {/* Row number column */}
           <td className="row-number-header">
             {row.rowNumber || rowIndex + 1}
@@ -199,7 +230,7 @@ const StatusTable = () => {
             
             return (
               <td 
-                key={isEmpty ? `empty-${rowIndex}-${colIndex}` : `cell-${rowIndex}-${colIndex}`}
+                key={isEmpty ? `empty-${rowIndex}-${colIndex}-${proxyPort}` : `cell-${rowIndex}-${colIndex}-${proxyPort}`}
                 className={`rtt-cell ${isEmpty ? 'empty' : ''} ${isHigh ? 'high-rtt' : ''} status-${item?.status || 'empty'}`}
                 title={isEmpty ? 'Waiting for data' : `RTT: ${item.rtt} | Status: ${item.status} | ${item.timestamp?.toLocaleTimeString()}`}
               >
@@ -227,22 +258,38 @@ const StatusTable = () => {
       <div className="table-header">
         <h2>RTT Monitor Dashboard</h2>
         <div className="controls">
-          <div className="control-item">
-            <label htmlFor="columnCount">Columns: </label>
-            <select 
-              id="columnCount"
-              value={columnCount} 
-              onChange={(e) => setColumnCount(Number(e.target.value))}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+          <div className="control-group">
+            <div className="control-item">
+              <label htmlFor="proxyPort">Proxy: </label>
+              <select 
+                id="proxyPort"
+                value={proxyPort} 
+                onChange={(e) => setProxyPort(e.target.value)}
+                disabled={loading}
+              >
+                <option value="10220">Spain Digi Mobile (10220)</option>
+                <option value="10041">UK Virgin Media (10041)</option>
+              </select>
+            </div>
+            <div className="control-item">
+              <label htmlFor="columnCount">Columns: </label>
+              <select 
+                id="columnCount"
+                value={columnCount} 
+                onChange={(e) => setColumnCount(Number(e.target.value))}
+                disabled={loading}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
           
-          <button onClick={fetchStatus} disabled={loading}>
+          {/* Send Packet button now calls fetchStatus with false (append mode) */}
+          <button onClick={() => fetchStatus(false)} disabled={loading}>
             {loading ? 'Measuring...' : 'Send Packet'}
           </button>
           
@@ -275,7 +322,7 @@ const StatusTable = () => {
             {statusData.length > 0 ? generateTableRows() : (
               <tr>
                 <td colSpan={columnCount + 2} className="no-data">
-                  {loading ? 'Measuring network latency... This may take a while.' : 'No data available'}
+                  {loading ? `Measuring network latency via ${proxyPort === '10220' ? 'Spain Digi Mobile' : 'UK Virgin Media'}... This may take a while.` : 'No data available'}
                 </td>
               </tr>
             )}
@@ -286,6 +333,8 @@ const StatusTable = () => {
       <div className="table-info">
         <p>
           Displaying: {statusData.length} targets × {columnCount} time points
+          <br />
+          Current Proxy: {proxyPort === '10220' ? 'Spain Digi Mobile (10220)' : 'UK Virgin Media (10041)'}
         </p>
       </div>
     </div>

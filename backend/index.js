@@ -49,6 +49,10 @@ app.get('/get-nodes', (req, res) => {
 
 app.get('/now-status', async (req, res) => {
     try {
+        const { proxyPort } = req.query;
+        const defaultPort = 10220;
+        const selectedPort = proxyPort ? parseInt(proxyPort) : defaultPort;
+
         const url = "https://slave.host-palace.net/portugal_cdn/get_node_list";
         const response = await axios.get(url);
         const data = response.data;
@@ -57,7 +61,7 @@ app.get('/now-status', async (req, res) => {
             .filter(item => typeof item === "object" && item.category === 4)
             .map(item => item.ip);
 
-        console.log(`🔄 Processing ${ipList.length} IPs in parallel...`);
+        console.log(`🔄 Processing ${ipList.length} IPs via proxy port ${selectedPort}...`);
 
         // Process in parallel instead of sequentially
         const results = await Promise.all(
@@ -65,18 +69,19 @@ app.get('/now-status', async (req, res) => {
                 ip, 
                 80, 
                 'proxy.soax.com', 
-                10220, 
+                selectedPort, // Use the selected port from frontend
                 process.env.PROXY_USER, 
                 process.env.PROXY_PASS, 
                 10000
             ))
         );
 
-        console.log(`✅ Completed measurements for ${results.length} targets`);
+        console.log(`✅ Completed measurements for ${results.length} targets using port ${selectedPort}`);
 
         res.json({
             status: "completed",
             count: results.length,
+            proxyPort: selectedPort,
             results
         });
     } catch (err) {
