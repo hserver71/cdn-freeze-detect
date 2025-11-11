@@ -4,9 +4,9 @@
   "description": "Monitor the freezing status using this project.",
   "main": "index.js",
   "scripts": {
-     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
-     "start:backend": "cd backend && npm start",
-     "start:frontend": "cd frontend && npm start",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,5 +14,8 @@
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "redis": "^5.8.3"
   }
 }

@@ -1,0 +1,1 @@
+export const backendApiUrl = 'http://162.247.153.49:5000';

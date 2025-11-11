@@ -4,22 +4,23 @@ import { NavLink } from 'react-router-dom';
 const Navigation = () => {
   return (
     <nav className="main-nav">
-      <NavLink 
-        to="/dashboard" 
-        className={({ isActive }) => 
+      <NavLink
+        to="/dashboard"
+        className={({ isActive }) =>
           `nav-link ${isActive ? 'active' : ''}`
         }
       >
         Dashboard
       </NavLink>
-      <NavLink 
-        to="/history" 
-        className={({ isActive }) => 
+      <NavLink
+        to="/history"
+        className={({ isActive }) =>
           `nav-link ${isActive ? 'active' : ''}`
         }
       >
         History
       </NavLink>
+      
     </nav>
   );
 };

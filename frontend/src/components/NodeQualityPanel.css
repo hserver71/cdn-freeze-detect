@@ -1,0 +1,564 @@
+.quality-two-column {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 1rem 0.75rem;
+}
+
+.quality-two-column td {
+  vertical-align: top;
+  padding: 0;
+  border-bottom: none;
+}
+
+.quality-node-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: rgba(241, 245, 249, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  min-height: 90px;
+}
+
+.quality-node-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.quality-node-badge.blocked {
+  background: rgba(239, 68, 68, 0.18);
+  color: #b91c1c;
+}
+
+.quality-node-badge.bad {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.quality-node-badge.bandwidth {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
+.quality-node-meta {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.quality-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.quality-modal {
+  background: #fff;
+  border-radius: 1rem;
+  width: min(720px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+}
+
+.quality-modal.large {
+  width: min(860px, 94vw);
+}
+
+.quality-modal-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.quality-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.modal-close-button {
+  font-size: 1.6rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.quality-modal-body {
+  padding: 1rem 1.25rem 1.5rem;
+  overflow: auto;
+}
+
+.quality-analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quality-analytics-table th,
+.quality-analytics-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.quality-analytics-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.quality-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 100%;
+  position: relative;
+}
+
+.quality-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quality-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.quality-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.refresh-button {
+  background-color: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.refresh-button:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.refresh-button:not(:disabled):hover {
+  background-color: #1d4ed8;
+}
+
+.quality-banner {
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+}
+
+.quality-banner.warning {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.quality-filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.quality-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.quality-filter-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.quality-filter-group select {
+  min-width: 160px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid #d1d5db;
+  background-color: #fff;
+  color: #111827;
+}
+
+.quality-filter-hint {
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.analysis-button-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.analytics-button {
+  align-self: flex-end;
+  margin-left: auto;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.analytics-button:disabled {
+  background: #fcd9bd;
+  cursor: not-allowed;
+}
+
+.analytics-button:not(:disabled):hover {
+  background: #ea580c;
+}
+
+.analysis-button {
+  align-self: flex-end;
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.5rem 1.05rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.analysis-button:disabled {
+  background: #bae6fd;
+  cursor: not-allowed;
+}
+
+.analysis-button:not(:disabled):hover {
+  background: #0284c7;
+}
+
+.analysis-button.secondary {
+  background: #10b981;
+}
+
+.analysis-button.secondary:disabled {
+  background: #a7f3d0;
+}
+
+.analysis-button.secondary:not(:disabled):hover {
+  background: #059669;
+}
+
+.daily-analysis-status {
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+  color: #1f2937;
+}
+
+.daily-analysis-status.success {
+  color: #047857;
+}
+
+.daily-analysis-status.error {
+  color: #b91c1c;
+}
+
+.quality-tables {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+.quality-table-block {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 360px;
+}
+
+.quality-table-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quality-table-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.quality-table-count {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.quality-table-scroll {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.quality-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quality-table-scroll th,
+.quality-table-scroll td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.quality-table-scroll th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  background: rgba(148, 163, 184, 0.12);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.quality-table-scroll tbody tr:hover {
+  background: rgba(37, 99, 235, 0.07);
+}
+
+.quality-table-empty {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.quality-placeholder {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 0.85rem;
+  padding: 1.25rem;
+  text-align: center;
+  color: #475569;
+}
+
+.mono {
+  font-family: 'Fira Code', 'Source Code Pro', monospace;
+  letter-spacing: 0.01em;
+}
+
+.quality-footer-status {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  margin-top: auto;
+  border-radius: 0.6rem 0.6rem 0 0;
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(6px);
+}
+
+.quality-status-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 160px;
+}
+
+.quality-status-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.quality-status-values {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.quality-status-primary {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.quality-status-meta {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.daily-analysis-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.daily-analysis-range {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.daily-analysis-peak {
+  background: #fff;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.9rem 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.daily-analysis-peak h4 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.daily-analysis-peak table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.daily-analysis-peak th,
+.daily-analysis-peak td {
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  font-size: 0.82rem;
+  color: #1f2937;
+}
+
+.daily-analysis-peak th {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.daily-analysis-peak tbody tr:hover {
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.daily-analysis-section {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.daily-analysis-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.daily-analysis-heading h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.daily-analysis-meta {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.daily-analysis-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.daily-analysis-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border-left: 4px solid rgba(14, 165, 233, 0.5);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.daily-analysis-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.daily-analysis-primary {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.daily-analysis-sub {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.daily-analysis-metric {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.daily-analysis-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.daily-analysis-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+

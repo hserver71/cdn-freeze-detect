@@ -1,8 +1,7 @@
-const DatabaseService = require('../services/databaseService');
-
 class MeasurementController {
-  constructor(databaseService) {
+  constructor(databaseService, proxyService) {
     this.databaseService = databaseService;
+    this.proxyService = proxyService;
   }
 
   async getLatestMeasurements(req, res) {
@@ -69,22 +68,22 @@ class MeasurementController {
       try {
         if (safe === 'true') {
           // Use safe method with template literals
-          result = await this.databaseService.getMeasurementsTimelineSafe(proxyPortNum, limitNum);
+          result = await this.databaseService.getMeasurementsTimelineSafe(proxyPortNum, limitNum, this.proxyService);
         } else if (page) {
           // Use paginated endpoint
           const pageNum = parseInt(page, 10);
           const pageSizeNum = Math.min(parseInt(pageSize, 10), 50);
           result = await this.databaseService.getMeasurementsTimelinePaginated(
-            proxyPortNum, pageNum, pageSizeNum, limitNum
+            proxyPortNum, pageNum, pageSizeNum, limitNum, this.proxyService
           );
         } else if (optimized === 'true') {
           // Use optimized single query
-          result = await this.databaseService.getMeasurementsTimelineOptimized(proxyPortNum, limitNum);
+          result = await this.databaseService.getMeasurementsTimelineOptimized(proxyPortNum, limitNum, this.proxyService);
         } else {
           // Use original method
-          result = await this.databaseService.getMeasurementsTimeline(proxyPortNum, limitNum);
+          result = await this.databaseService.getMeasurementsTimeline(proxyPortNum, limitNum, this.proxyService);
         }
-        
+        // console.log({result})
         res.json({
           success: true,
           count: result.length,
@@ -95,7 +94,7 @@ class MeasurementController {
       } catch (dbError) {
         // If parameterized queries fail, fall back to safe method
         console.log('🔄 Parameterized query failed, falling back to safe method');
-        result = await this.databaseService.getMeasurementsTimelineSafe(proxyPortNum, limitNum);
+        result = await this.databaseService.getMeasurementsTimelineSafe(proxyPortNum, limitNum, this.proxyService);
         
         res.json({
           success: true,
@@ -138,6 +137,28 @@ class MeasurementController {
       });
     }
   }
+  async getLiveServers(req, res) {
+    try {
+        // Get live IPs from ProxyService
+        const ipList = await this.proxyService.getIPList();
+        
+        res.json({
+            success: true,
+            servers: ipList.map(ip => ({ 
+                ip: ip,
+                alive: true 
+            })),
+            total: ipList.length,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ Error getting live servers:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get live servers'
+        });
+    }
+}s
 }
 
 module.exports = MeasurementController;
